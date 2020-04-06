@@ -53,7 +53,7 @@ export class WelcomeRepeatUSScreen extends Component<PropsType, WelcomeRepeatUSS
 
         if (hasPatientDetails) {
             if (await userService.isHealthWorker()) {
-                this.props.navigation.navigate('HealthWorkerExposure', {patientId: patientId})
+                this.props.navigation.navigate('HealthWorkerExposure', {patientId: patientId, assessmentId: null})
             } else {
                 this.props.navigation.navigate('CovidTest', {patientId: patientId, assessmentId: null})
             }
