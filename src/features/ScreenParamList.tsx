@@ -17,7 +17,7 @@ export type ScreenParamList = {
     ResetPasswordConfirm: undefined;
     Register: undefined;
     OptionalInfo: { user: UserResponse };
-    HealthWorkerExposure: { patientId: string };
+    HealthWorkerExposure: { patientId: string, assessmentId: string | null };
     YourWork: { patientId: string };
     AboutYou: { patientId: string };
     YourHealth: { patientId: string, isMale: boolean};

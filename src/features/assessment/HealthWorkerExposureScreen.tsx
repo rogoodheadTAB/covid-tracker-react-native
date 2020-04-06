@@ -55,13 +55,24 @@ export default class HealthWorkerExposureScreen extends Component<HealthWorkerEx
     }
 
     handleUpdate(formData: HealthWorkerExposureData) {
-        const patientId = this.props.route.params.patientId;
+        const {patientId, assessmentId} = this.props.route.params;
         const userService = new UserService();
         var assessment = this.createAssessment(formData);
 
-        userService.addAssessment(assessment)
-            .then(response => this.props.navigation.navigate('CovidTest', {patientId: patientId, assessmentId: response.data.id}))
-            .catch(err => this.setState({errorMessage: i18n.t("something-went-wrong")}));
+        if (assessmentId == null) {
+            userService.addAssessment(assessment)
+                .then(response => {
+                    this.props.route.params.assessmentId = response.data.id
+                    this.props.navigation.navigate('CovidTest', {patientId: patientId, assessmentId: response.data.id})
+                })
+                .catch(err => this.setState({errorMessage: i18n.t("something-went-wrong")}));
+        } else {
+            userService.updateAssessment(assessmentId, assessment)
+                .then(response => {
+                    this.props.navigation.navigate('CovidTest', {patientId: patientId, assessmentId: assessmentId})
+                })
+                .catch(err => this.setState({errorMessage: i18n.t("something-went-wrong")}));
+        }
     }
 
     private createAssessment(formData: HealthWorkerExposureData) {
