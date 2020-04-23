@@ -1,5 +1,37 @@
 import express = require("express");
 import bodyParser = require("body-parser");
+import { v4 as uuidv4 } from "uuid";
+
+import low = require("lowdb");
+import FileSync = require("lowdb/adapters/FileSync");
+import {
+  UserResponse,
+  PatientInfosRequest,
+  TokenInfoResponse,
+  AssessmentResponse,
+  PiiRequest,
+  Consent,
+} from "../src/core/user/dto/UserAPIContracts";
+
+type Schema = {
+  users: User[];
+  profiles: { userId: String; data: UserResponse }[];
+  patients: { userId: String; patientId: String; data: PatientInfosRequest }[];
+  tokens: { userId: String; data: TokenInfoResponse }[];
+  assessments: { userId: String; data: AssessmentResponse }[];
+  information: { userId: String; data: PiiRequest }[];
+  consent: { userId: String; data: Consent }[];
+};
+
+type User = {
+  id: String;
+  username: String;
+  password: String;
+  token: String;
+};
+
+const adapter = new FileSync<Schema>("./db.json");
+const db = low(adapter);
 
 const app = express();
 const port = 3000;
@@ -8,43 +40,99 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 app.post("/auth/login", (req, res) => {
+  const user = db
+    .get("users")
+    .find({
+      username: req.body.username,
+      password: req.body.password1,
+    })
+    .value();
+
+  const profile = db.get("profiles").find({
+    userId: user.id,
+  });
+
   return res.status(200).send({
-    key: "abc",
-    user: {
-      username: "testuser@example.com",
-      authorizations: [],
-      patients: ["00000000-0000-0000-0000-000000000000"],
-      pii: "00000000-0000-0000-0000-000000000000",
-      push_tokens: [],
-      country_code: "GB",
-    },
+    key: user.token,
+    user: profile,
   });
 });
 
 app.post("/auth/password/reset", (req, res) => {
+  const user = db
+    .get("users")
+    .find({
+      username: req.body.username,
+    })
+    .value();
+
+  if (!user) {
+    // return error
+  }
+
+  if (user) {
+    // send reset email to user
+  }
+
   return res.send();
 });
 
 app.post("/auth/signup", (req, res) => {
-  return res.status(201).send({
-    key: "abc",
-    user: {
-      username: "testuser@example.com",
+  if (req.body.password1 !== req.body.password2) {
+    //return error
+  }
+
+  const userId = uuidv4();
+  const token = "abc";
+
+  db.get("users").push({
+    id: userId,
+    username: req.body.username,
+    password: req.body.password1,
+    token: uuidv4().toLowerCase(),
+  });
+
+  const profile = db.get("profiles").push({
+    userId,
+    data: {
+      username: req.body.username,
       authorizations: [],
-      patients: ["00000000-0000-0000-0000-000000000000"],
-      pii: "00000000-0000-0000-0000-000000000000",
-      push_tokens: [],
-      country_code: "GB",
+      patients: [uuidv4()],
+      pii: uuidv4(),
     },
+  });
+
+  return res.status(201).send({
+    key: token,
+    user: profile,
   });
 });
 
+app.use((req, res, next): any => {
+  if (!req.headers.authorization) {
+    return res.status(403).json({ error: "No credentials sent!" });
+  }
+  next();
+});
+
+function getLoggedInUser(req: any): User {
+  const token = req.headers.authorization.toLowerCase().replace("bearer ", "");
+  const user = db.get("users").find({ token }).value();
+  return user;
+}
+
 app.post("/tokens", (req, res) => {
-  return res.send({
-    token: "abcd",
-    active: true,
-    platform: "ANDROID",
-  });
+  const user = getLoggedInUser(req);
+
+  const newPushNotificationToken = {
+    token: req.body.token,
+    active: req.body.active,
+    platform: req.body.android,
+  };
+
+  db.get("tokens").push({ userId: user.id, data: newPushNotificationToken });
+
+  return res.send(newPushNotificationToken);
 });
 
 app.patch("/consent", (req, res) => {
@@ -52,133 +140,63 @@ app.patch("/consent", (req, res) => {
 });
 
 app.get("/patients/:patientId", (req, res) => {
-  return res.status(200).send({
-    year_of_birth: null,
-    height_cm: null,
-    height_feet: null,
-    weight_kg: null,
-    weight_pounds: null,
-    gender: null,
-    gender_identity: null,
-    postcode: null,
-    needs_help: null,
-    housebound_problems: null,
-    help_available: null,
-    mobility_aid: null,
-    is_in_uk_twins: null,
-    is_in_uk_biobank: null,
-    is_in_uk_guys_trust: null,
-    is_in_us_nurses_study: null,
-    is_in_us_mass_general_brigham: null,
-    is_in_us_stanford_diabetes: null,
-    is_in_us_stanford_well: null,
-    is_in_us_growing_up_today: null,
-    is_in_us_stanford_nutrition: null,
-    is_in_us_multiethnic_cohort: null,
-    is_in_us_predict2: null,
-    is_in_us_american_cancer_society_cancer_prevention_study_3: null,
-    is_in_us_harvard_health_professionals: null,
-    is_in_us_california_teachers: null,
-    is_in_us_sister: null,
-    is_in_us_agricultural_health: null,
-    is_in_us_gulf: null,
-    is_in_us_aspree_xt: null,
-    contact_health_worker: null,
-    healthcare_professional: null,
-    is_carer_for_community: null,
-    have_worked_in_hospital_inpatient: null,
-    have_worked_in_hospital_outpatient: null,
-    have_worked_in_hospital_clinic: null,
-    have_worked_in_hospital_care_facility: null,
-    have_worked_in_hospital_home_health: null,
-    have_worked_in_hospital_school_clinic: null,
-    have_worked_in_hospital_other: null,
-    interacted_patients_with_covid: null,
-    have_used_PPE: null,
-    always_used_shortage: null,
-    sometimes_used_shortage: null,
-    never_used_shortage: null,
-    limited_activity: null,
-    has_heart_disease: null,
-    has_diabetes: null,
-    has_lung_disease: null,
-    is_smoker: null,
-    need_outside_help: null,
-    need_inside_help: null,
-    has_kidney_disease: null,
-    does_chemiotherapy: null,
-    takes_immunosuppressants: null,
-    takes_corticosteroids: null,
-    takes_blood_pressure_medications: null,
-    takes_any_blood_pressure_medications: null,
-    takes_blood_pressure_medications_sartan: null,
-    already_had_covid: null,
-    classic_symptoms: null,
-    is_pregnant: null,
-    interacted_with_covid: null,
-    smoker_status: null,
-    smoked_years_ago: null,
-    takes_aspirin: null,
-    has_cancer: null,
-    classic_symptoms_days_ago: null,
-    cancer_type: null,
-    on_cancer_clinical_trial: null,
-    cancer_clinical_trial_site: null,
-    cancer_clinical_trial_nct_id: null,
-    cancer_physician_name: null,
-    version: "",
-    profile_attributes_updated_at: null,
-  });
+  const user = getLoggedInUser(req);
+  const patient = db
+    .get("patients")
+    .find({ userId: user.id, patientId: req.query.patientId })
+    .value();
+  return res.status(200).send(patient.data);
 });
 
 app.patch("/patients/:patientId", (req, res) => {
-  return res.send();
+  const user = getLoggedInUser(req);
+  const patient = db
+    .get("patients")
+    .find({ userId: user.id, patientId: req.query.patientId })
+    .set("data", req.body)
+    .value();
+  return res.send(patient);
 });
 
 app.get("/profile", (req, res) => {
-  return res.status(200).send({
-    username: "testuser@example.com",
-    authorizations: [],
-    patients: ["00000000-0000-0000-0000-000000000000"],
-    pii: "00000000-0000-0000-0000-000000000000",
-    push_tokens: [],
-    country_code: "GB",
-  });
+  const user = getLoggedInUser(req);
+  const profile = db.get("profiles").find({ userId: user.id }).value();
+  return res.status(200).send(profile.data);
 });
 
 app.patch("/information/:userId", (req, res) => {
-  return res.send()
+  const user = getLoggedInUser(req);
+  const information = db
+    .get("information")
+    .find({ userId: user.id })
+    .set("data", req.body)
+    .value();
+  return res.send(information);
 });
 
 app.post("/assessments", (req, res) => {
-  return res.send({
-    id: 'abcde'
-  })
+  const user = getLoggedInUser(req);
+  const assessments = db.get("assessments").find({ userId: user.id }).value();
+  return res.send(assessments.data);
 });
 
 app.patch("/assessments/:assessmentId", (req, res) => {
-  return res.send({
-    id: 'abcde'
-  })
+  const user = getLoggedInUser(req);
+  const assessment = db
+    .get("assessments")
+    .find({ userId: user.id, data: { id: req.query.assessmentId } })
+    .value();
+  return res.send(assessment);
 });
 
 app.get("/users/covid_count", (req, res) => {
-  return res.status(200).send('2000000');
+  const covidCount = db.get("covidCount").value();
+  return res.status(200).send(covidCount);
 });
 
 app.get("/area_stats", (req, res) => {
-
-  return res.status(200).send({
-    "locked": false,
-    "rank": 768,
-    "number_of_areas": 1000,
-    "rank_delta": 24,
-    "area_name": "Suffolk County",
-    "number_of_missing_contributors": 100,
-    "predicted_cases": 698,
-    "population": 42000,
-  });
+  const areaStats = db.get("areaStats").value();
+  return res.status(200).send(db.get(areaStats));
 });
-
 
 app.listen(port, () => console.log(`Listening at http://localhost:${port}`));
